@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "revrebel-like-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-05",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Comma-separated origins. Use "*" while testing, then lock it down.
+    // Example: "https://www.revrebel.io,https://revrebel.io"
+    "ALLOWED_ORIGINS": "*"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "LIKES_VIEWS_KV",
+      "id": "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID",
+      "preview_id": "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+    }
+  ]
+}

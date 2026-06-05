@@ -1,109 +1,89 @@
-# REVREBEL Like/View Cloudflare Worker
+<p align="left">
+  <picture>
+    <source
+      media="(prefers-color-scheme: dark)"
+      srcset=".github/assets/readme-banner_dark.jpg"
+    />
+    <img
+      src=".github/assets/readme-banner_light.jpg"
+      alt="__REPO__ repository banner"
+    />
+  </picture>
+</p>
 
-Small standalone Cloudflare Worker API for Webflow like and view tracking.
+<p align="right">__REPO__ a project by REVREBEL</p>
 
-## What this includes
+# __REPO_UPPER__
 
-- `GET /` service info
-- `GET /api/health` health check
-- `GET /likes-views-devlink.js` Webflow/DevLink browser script
-- `POST /api/views/increment`
-- `POST /api/likes/increment`
-- `POST /api/likes/decrement`
-- `GET /api/stats/:slug`
+<div align="left">
+  <a href="https://github.com/__OWNER__/__REPO__/issues">
+    <img src="https://img.shields.io/github/issues/__OWNER__/__REPO__?color=163666&style=for-the-badge&logo=github" alt="Issues"/>
+  </a>
+  <a href="https://github.com/__OWNER__/__REPO__/pulls">
+    <img src="https://img.shields.io/github/issues-pr/__OWNER__/__REPO__?color=71c9c5&style=for-the-badge&logo=github" alt="PRs"/>
+  </a>
+</div>
 
-## 1. Install
+<br>
+<br>
 
-```bash
-npm install
-```
+## **THE PROJECT**
 
-## 2. Create the KV namespaces
+* <!-- ... [WHY DID YOU CREATE THIS PROJECT?, MOTIVATION, PURPOSE, DESCRIPTION, OBJECTIVES, etc] -->
 
-```bash
-npx wrangler kv namespace create LIKES_VIEWS_KV
-npx wrangler kv namespace create LIKES_VIEWS_KV --preview
-```
+<br>
+<br>
 
-Copy the returned IDs into `wrangler.jsonc`:
+## **INSTALLATION**
 
-```jsonc
-"kv_namespaces": [
-  {
-    "binding": "LIKES_VIEWS_KV",
-    "id": "YOUR_PRODUCTION_ID",
-    "preview_id": "YOUR_PREVIEW_ID"
-  }
-]
-```
+* <!-- ... [SHOW HOW YOUR PROJECT IS INSTALLED] -->
 
-## 3. Test locally
 
-```bash
-npm run dev
-```
 
-Health check:
+## **USAGE**
 
-```bash
-curl http://localhost:8787/api/health
-```
+* <!-- ... [SHOW HOW YOUR PROJECT IS USED] -->
 
-Increment a like:
+<br>
+<br>
 
-```bash
-curl -X POST http://localhost:8787/api/likes/increment \
-  -H "Content-Type: application/json" \
-  -d '{"slug":"test-post"}'
-```
+## **PROJECT TREE**
 
-Read stats:
+<!-- ... [SHOW YOUR PROJECT TREE HERE IF USEFUL] -->
 
-```bash
-curl http://localhost:8787/api/stats/test-post
-```
+<br>
+<br>
 
-## 4. Deploy
+## **NOTES**
 
-```bash
-npm run deploy
-```
+* <!-- ... [ADD ADDITIONAL NOTES] -->
 
-Then add a custom domain in Cloudflare Workers, for example:
+<br>
+<br>
 
-```txt
-likes.revrebel.io
-```
+## **SCREENSHOTS**
 
-## 5. Webflow setup
+<!-- ... [SOME DESCRIPTIVE IMAGES] -->
 
-Add this before `</body>` in Webflow:
 
-```html
-<script>
-  window.LIKES_API_BASE = "https://likes.revrebel.io";
-</script>
-<script src="https://likes.revrebel.io/likes-views-devlink.js"></script>
-```
 
-Like button element:
+<br>
+<br>
 
-```html
-<button data-action-like="your-post-slug" aria-pressed="false">
-  Like <span data-metric-like="your-post-slug">0</span>
-</button>
-```
-
-View tracker:
-
-```html
-<div data-action-view="your-post-slug" hidden></div>
-Views: <span data-metric-view="your-post-slug">0</span>
-```
-
-For Webflow CMS, use the CMS slug as the value for each matching data attribute.
-
-## Notes
-
-Cloudflare KV is a good simple fit for lightweight blog/article likes and views. If exact counting under heavy concurrent traffic becomes important, move counter writes to a Durable Object later.
-# like-api
+<table>
+  <tbody>
+    <tr>
+      <td valign="middle" width="1200" height="200" >
+          <div>
+            <img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/get-in-touch_dark.png" alt="Get in Touch" width="150" valign="top" />
+            &emsp;
+            <a href="https://github.com/REVREBEL" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/github-outline_dark.png" alt="GitHub" width="36" /></a>
+            <a href="mailto:hello@revrebel.io" target="_blank" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/email-outline_dark.png" alt="Email" width="36" /></a>
+            <a href="https://www.linkedin.com/company/revrebel/" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/linkedin-outline.png" alt="LinkedIn" width="36" /></a>
+            <a href="https://www.revrebel.io/blog" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/blog-outline.png" alt="Blog" width="36" /></a>
+            <a href="https://revrebel.io" target="_blank" style="display: inline-block;"><img src="https://img.shields.io/badge/website-163666?style=for-the-badge" alt="Website" height="40" align="right" /></a>
+          </div>
+      </td>
+    </tr>
+  </tbody>
+</table>
