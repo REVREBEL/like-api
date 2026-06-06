@@ -1,89 +1,134 @@
-<p align="left">
-  <picture>
-    <source
-      media="(prefers-color-scheme: dark)"
-      srcset=".github/assets/readme-banner_dark.jpg"
-    />
-    <img
-      src=".github/assets/readme-banner_light.jpg"
-      alt="like-api repository banner"
-    />
-  </picture>
-</p>
+# REVREBEL Like API
 
-<p align="right">like-api a project by REVREBEL</p>
+Cloudflare Worker API for Webflow-powered like and view counters.
 
-# LIKE-API
+This project uses **Cloudflare Workers** for the API and **Cloudflare D1** for storage so the database schema is owned by the repo through SQL migrations.
 
-<div align="left">
-  <a href="https://github.com/REVREBEL/like-api/issues">
-    <img src="https://img.shields.io/github/issues/REVREBEL/like-api?color=163666&style=for-the-badge&logo=github" alt="Issues"/>
-  </a>
-  <a href="https://github.com/REVREBEL/like-api/pulls">
-    <img src="https://img.shields.io/github/issues-pr/REVREBEL/like-api?color=71c9c5&style=for-the-badge&logo=github" alt="PRs"/>
-  </a>
-</div>
+## Routes
 
-<br>
-<br>
+```txt
+GET  /
+GET  /api/health
+GET  /likes-views-devlink.js
+POST /api/views/increment
+POST /api/likes/increment
+POST /api/likes/decrement
+GET  /api/stats/:slug
+```
 
-## **THE PROJECT**
+## Database
 
-* <!-- ... [WHY DID YOU CREATE THIS PROJECT?, MOTIVATION, PURPOSE, DESCRIPTION, OBJECTIVES, etc] -->
+The Worker expects a D1 binding named:
 
-<br>
-<br>
+```txt
+DB
+```
 
-## **INSTALLATION**
+The Wrangler database name is:
 
-* <!-- ... [SHOW HOW YOUR PROJECT IS INSTALLED] -->
+```txt
+revrebel-like-api-db
+```
 
+Migrations create:
 
+```txt
+content_counters
+counter_events
+```
 
-## **USAGE**
+## First-time setup
 
-* <!-- ... [SHOW HOW YOUR PROJECT IS USED] -->
+Install dependencies:
 
-<br>
-<br>
+```bash
+npm install
+```
 
-## **PROJECT TREE**
+Create the D1 database:
 
-<!-- ... [SHOW YOUR PROJECT TREE HERE IF USEFUL] -->
+```bash
+npm run db:create
+```
 
-<br>
-<br>
+Wrangler will return a `database_id`. Paste that ID into `wrangler.jsonc` under `d1_databases`:
 
-## **NOTES**
+```jsonc
+"d1_databases": [
+  {
+    "binding": "DB",
+    "database_name": "revrebel-like-api-db",
+    "database_id": "PASTE_DATABASE_ID_HERE"
+  }
+]
+```
 
-* <!-- ... [ADD ADDITIONAL NOTES] -->
+Apply migrations to the remote D1 database:
 
-<br>
-<br>
+```bash
+npm run db:migrate:remote
+```
 
-## **SCREENSHOTS**
+Deploy the Worker:
 
-<!-- ... [SOME DESCRIPTIVE IMAGES] -->
+```bash
+npm run deploy
+```
 
+## Cloudflare Workers Builds
 
+After the D1 database exists and the `database_id` is committed in `wrangler.jsonc`, use this build/deploy command:
 
-<br>
-<br>
+```bash
+npm run db:migrate:remote && npm run deploy
+```
 
-<table>
-  <tbody>
-    <tr>
-      <td valign="middle" width="1200" height="200" >
-          <div>
-            <img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/get-in-touch_dark.png" alt="Get in Touch" width="150" valign="top" />
-            &emsp;
-            <a href="https://github.com/REVREBEL" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/github-outline_dark.png" alt="GitHub" width="36" /></a>
-            <a href="mailto:hello@revrebel.io" target="_blank" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/email-outline_dark.png" alt="Email" width="36" /></a>
-            <a href="https://www.linkedin.com/company/revrebel/" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/linkedin-outline.png" alt="LinkedIn" width="36" /></a>
-            <a href="https://www.revrebel.io/blog" target="_blank"><img src="https://raw.githubusercontent.com/REVREBEL/.github/main/assets/icons/blog-outline.png" alt="Blog" width="36" /></a>
-            <a href="https://revrebel.io" target="_blank" style="display: inline-block;"><img src="https://img.shields.io/badge/website-163666?style=for-the-badge" alt="Website" height="40" align="right" /></a>
-          </div>
-      </td>
-    </tr>
-  </tbody>
-</table>
+If Cloudflare does not install dependencies automatically, use:
+
+```bash
+npm install && npm run db:migrate:remote && npm run deploy
+```
+
+## Webflow embed
+
+Add this before `</body>`:
+
+```html
+<script>
+  window.LIKES_API_BASE = "https://likes.revrebel.io";
+</script>
+<script src="https://likes.revrebel.io/likes-views-devlink.js"></script>
+```
+
+Example attributes:
+
+```html
+<button data-action-like="your-post-slug" data-storage-key="your-post-slug" aria-pressed="false">
+  Like <span data-metric-like="your-post-slug">0</span>
+</button>
+
+<div data-action-view="your-post-slug" hidden></div>
+Views: <span data-metric-view="your-post-slug">0</span>
+```
+
+## Test commands
+
+Health:
+
+```bash
+curl https://likes.revrebel.io/api/health
+```
+
+Increment like:
+
+```bash
+curl -X POST https://likes.revrebel.io/api/likes/increment \
+  -H "Content-Type: application/json" \
+  -d '{"slug":"test-post"}'
+```
+
+Get stats:
+
+```bash
+curl https://likes.revrebel.io/api/stats/test-post
+```

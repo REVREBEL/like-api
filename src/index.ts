@@ -1,297 +1,238 @@
-type Stats = {
+type CounterRow = {
   slug: string;
   likes: number;
   views: number;
-  updatedAt: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
-type IncrementBody = {
-  slug?: string;
-};
+type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+type JsonObject = { [key: string]: JsonValue };
 
-const JSON_HEADERS = {
-  'Content-Type': 'application/json; charset=utf-8',
-  'Cache-Control': 'no-store',
-};
+const JS_CLIENT = `(() => {
+  const API_BASE = (window.LIKES_API_BASE || '').replace(/\/$/, '');
 
-function getCorsHeaders(request: Request, env: Env): HeadersInit {
-  const origin = request.headers.get('Origin') || '';
-  const allowed = (env.ALLOWED_ORIGINS || '*')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
+  const getSlug = (el, attr) => el.getAttribute(attr) || el.getAttribute('data-storage-key') || window.location.pathname.replace(/^\/+|\/+$/g, '') || 'home';
+  const fmt = (value) => Number(value || 0).toLocaleString();
 
-  const allowOrigin =
-    allowed.includes('*') || !origin
-      ? '*'
-      : allowed.includes(origin)
-        ? origin
-        : allowed[0] || '*';
-
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-    'Access-Control-Max-Age': '86400',
-    Vary: 'Origin',
-  };
-}
-
-function json(request: Request, env: Env, data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      ...JSON_HEADERS,
-      ...getCorsHeaders(request, env),
-    },
-  });
-}
-
-function text(request: Request, env: Env, body: string, contentType = 'text/plain; charset=utf-8', status = 200): Response {
-  return new Response(body, {
-    status,
-    headers: {
-      'Content-Type': contentType,
-      'Cache-Control': 'public, max-age=300',
-      ...getCorsHeaders(request, env),
-    },
-  });
-}
-
-function normalizeSlug(input: unknown): string | null {
-  if (typeof input !== 'string') return null;
-
-  const slug = input
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/[#?].*$/, '')
-    .replace(/\/+$/, '')
-    .replace(/[^a-z0-9/_:.-]+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 250);
-
-  return slug.length ? slug : null;
-}
-
-function statsKey(slug: string): string {
-  return `stats:${slug}`;
-}
-
-async function readStats(env: Env, slug: string): Promise<Stats> {
-  const existing = await env.LIKES_VIEWS_KV.get<Stats>(statsKey(slug), 'json');
-
-  return {
-    slug,
-    likes: Math.max(0, Number(existing?.likes || 0)),
-    views: Math.max(0, Number(existing?.views || 0)),
-    updatedAt: existing?.updatedAt || new Date(0).toISOString(),
-  };
-}
-
-async function writeStats(env: Env, stats: Stats): Promise<void> {
-  await env.LIKES_VIEWS_KV.put(statsKey(stats.slug), JSON.stringify(stats));
-}
-
-async function updateCounter(env: Env, slug: string, field: 'likes' | 'views', delta: number): Promise<Stats> {
-  // KV is eventually consistent and not ideal for high-concurrency counters.
-  // For blog/article interactions this is usually fine. For strict counters,
-  // move this update function into a Durable Object later.
-  const stats = await readStats(env, slug);
-  stats[field] = Math.max(0, stats[field] + delta);
-  stats.updatedAt = new Date().toISOString();
-  await writeStats(env, stats);
-  return stats;
-}
-
-async function parseSlugFromBody(request: Request): Promise<string | null> {
-  let body: IncrementBody | null = null;
-
-  try {
-    body = (await request.json()) as IncrementBody;
-  } catch {
-    return null;
-  }
-
-  return normalizeSlug(body?.slug);
-}
-
-function scriptSource(): string {
-  return `(() => {
-  const API_BASE = (window.LIKES_API_BASE || '').replace(/\\/$/, '');
-
-  const readText = (value) => {
-    const number = Number(value || 0);
-    return Number.isFinite(number) ? number : 0;
-  };
-
-  const postJSON = async (path, payload) => {
-    const response = await fetch(\`${'${API_BASE}'}\${path}\`, {
+  async function request(path, body) {
+    const response = await fetch(API_BASE + path, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      mode: 'cors',
+      body: JSON.stringify(body || {})
     });
-
-    if (!response.ok) throw new Error(\`Like API error: \${response.status}\`);
+    if (!response.ok) throw new Error(await response.text());
     return response.json();
-  };
+  }
 
-  const getJSON = async (path) => {
-    const response = await fetch(\`${'${API_BASE}'}\${path}\`, { mode: 'cors' });
-    if (!response.ok) throw new Error(\`Like API error: \${response.status}\`);
+  async function getStats(slug) {
+    const response = await fetch(API_BASE + '/api/stats/' + encodeURIComponent(slug));
+    if (!response.ok) throw new Error(await response.text());
     return response.json();
-  };
+  }
 
-  const localKey = (slug) => \`revrebel-liked:\${slug}\`;
+  function updateMetrics(slug, stats) {
+    document.querySelectorAll('[data-metric-like="' + CSS.escape(slug) + '"]').forEach((el) => el.textContent = fmt(stats.likes));
+    document.querySelectorAll('[data-metric-view="' + CSS.escape(slug) + '"]').forEach((el) => el.textContent = fmt(stats.views));
+  }
 
-  const setLikeState = (button, slug, liked) => {
-    button.classList.toggle('is-liked', liked);
-    button.setAttribute('aria-pressed', liked ? 'true' : 'false');
-    button.dataset.liked = liked ? 'true' : 'false';
+  async function hydrate(slug) {
     try {
-      if (liked) localStorage.setItem(localKey(slug), '1');
-      else localStorage.removeItem(localKey(slug));
-    } catch (_) {}
-  };
-
-  const updateMetrics = (slug, stats) => {
-    document.querySelectorAll(\`[data-metric-like="\${CSS.escape(slug)}"]\`).forEach((element) => {
-      element.textContent = String(readText(stats.likes));
-    });
-
-    document.querySelectorAll(\`[data-metric-view="\${CSS.escape(slug)}"]\`).forEach((element) => {
-      element.textContent = String(readText(stats.views));
-    });
-  };
-
-  const hydrateStats = async (slug) => {
-    try {
-      const stats = await getJSON(\`/api/stats/\${encodeURIComponent(slug)}\`);
+      const stats = await getStats(slug);
       updateMetrics(slug, stats);
     } catch (error) {
-      console.warn(error);
+      console.warn('[REVREBEL likes] stats failed', error);
     }
-  };
+  }
 
-  const initLikes = () => {
+  function initLikes() {
     document.querySelectorAll('[data-action-like]').forEach((button) => {
-      const slug = button.getAttribute('data-action-like');
-      if (!slug) return;
+      const slug = getSlug(button, 'data-action-like');
+      const storageKey = 'revrebel-like:' + (button.getAttribute('data-storage-key') || slug);
+      const liked = localStorage.getItem(storageKey) === '1';
+      button.classList.toggle('is-liked', liked);
+      button.setAttribute('aria-pressed', liked ? 'true' : 'false');
+      hydrate(slug);
 
-      let liked = false;
-      try { liked = localStorage.getItem(localKey(slug)) === '1'; } catch (_) {}
-      setLikeState(button, slug, liked);
-      hydrateStats(slug);
-
-      button.addEventListener('click', async (event) => {
-        event.preventDefault();
-        const nextLiked = button.dataset.liked !== 'true';
-        setLikeState(button, slug, nextLiked);
-
+      button.addEventListener('click', async () => {
+        const alreadyLiked = localStorage.getItem(storageKey) === '1';
+        const path = alreadyLiked ? '/api/likes/decrement' : '/api/likes/increment';
+        button.disabled = true;
         try {
-          const endpoint = nextLiked ? '/api/likes/increment' : '/api/likes/decrement';
-          const stats = await postJSON(endpoint, { slug });
+          const stats = await request(path, { slug });
+          localStorage.setItem(storageKey, alreadyLiked ? '0' : '1');
+          button.classList.toggle('is-liked', !alreadyLiked);
+          button.setAttribute('aria-pressed', !alreadyLiked ? 'true' : 'false');
           updateMetrics(slug, stats);
-          button.dispatchEvent(new CustomEvent('like:toggled', {
-            bubbles: true,
-            detail: { slug, liked: nextLiked, stats },
-          }));
+          window.dispatchEvent(new CustomEvent('like:toggled', { detail: { slug, liked: !alreadyLiked, stats } }));
         } catch (error) {
-          setLikeState(button, slug, !nextLiked);
-          console.warn(error);
+          console.warn('[REVREBEL likes] toggle failed', error);
+        } finally {
+          button.disabled = false;
         }
       });
     });
-  };
+  }
 
-  const initViews = () => {
-    document.querySelectorAll('[data-action-view]').forEach(async (element) => {
-      const slug = element.getAttribute('data-action-view');
-      if (!slug || element.dataset.viewTracked === 'true') return;
-      element.dataset.viewTracked = 'true';
-
+  function initViews() {
+    document.querySelectorAll('[data-action-view]').forEach(async (el) => {
+      const slug = getSlug(el, 'data-action-view');
+      const sessionKey = 'revrebel-view:' + slug;
+      if (sessionStorage.getItem(sessionKey) === '1') {
+        hydrate(slug);
+        return;
+      }
+      sessionStorage.setItem(sessionKey, '1');
       try {
-        const stats = await postJSON('/api/views/increment', { slug });
+        const stats = await request('/api/views/increment', { slug });
         updateMetrics(slug, stats);
       } catch (error) {
-        console.warn(error);
+        console.warn('[REVREBEL likes] view failed', error);
       }
     });
-  };
-
-  const init = () => {
-    initLikes();
-    initViews();
-  };
+  }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', () => { initLikes(); initViews(); });
   } else {
-    init();
+    initLikes();
+    initViews();
   }
 })();`;
-}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        status: 204,
-        headers: getCorsHeaders(request, env),
-      });
-    }
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request, env) });
 
-    if (request.method === 'GET' && url.pathname === '/') {
-      return json(request, env, {
-        ok: true,
-        service: 'REVREBEL Like/View Worker',
-        endpoints: [
-          'GET /api/health',
-          'GET /likes-views-devlink.js',
-          'POST /api/views/increment',
-          'POST /api/likes/increment',
-          'POST /api/likes/decrement',
-          'GET /api/stats/:slug',
-        ],
-      });
-    }
+    try {
+      if (url.pathname === '/') return json(request, env, { ok: true, service: 'revrebel-like-api', storage: 'd1' });
+      if (url.pathname === '/api/health') return health(request, env);
+      if (url.pathname === '/likes-views-devlink.js') {
+        return new Response(JS_CLIENT, {
+          headers: {
+            ...corsHeaders(request, env),
+            'Content-Type': 'application/javascript; charset=utf-8',
+            'Cache-Control': 'public, max-age=300'
+          }
+        });
+      }
 
-    if (request.method === 'GET' && url.pathname === '/api/health') {
-      return json(request, env, { ok: true, timestamp: new Date().toISOString() });
-    }
+      if (request.method === 'POST' && url.pathname === '/api/views/increment') {
+        const slug = await getSlugFromBody(request);
+        return json(request, env, await incrementCounter(env, request, slug, 'view', 1));
+      }
 
-    if (request.method === 'GET' && url.pathname === '/likes-views-devlink.js') {
-      return text(request, env, scriptSource(), 'application/javascript; charset=utf-8');
-    }
+      if (request.method === 'POST' && url.pathname === '/api/likes/increment') {
+        const slug = await getSlugFromBody(request);
+        return json(request, env, await incrementCounter(env, request, slug, 'like', 1));
+      }
 
-    if (request.method === 'GET' && url.pathname.startsWith('/api/stats/')) {
-      const rawSlug = decodeURIComponent(url.pathname.replace('/api/stats/', ''));
-      const slug = normalizeSlug(rawSlug);
-      if (!slug) return json(request, env, { error: 'Missing or invalid slug.' }, 400);
-      return json(request, env, await readStats(env, slug));
-    }
+      if (request.method === 'POST' && url.pathname === '/api/likes/decrement') {
+        const slug = await getSlugFromBody(request);
+        return json(request, env, await incrementCounter(env, request, slug, 'like', -1));
+      }
 
-    if (request.method === 'POST' && url.pathname === '/api/views/increment') {
-      const slug = await parseSlugFromBody(request);
-      if (!slug) return json(request, env, { error: 'Missing or invalid slug.' }, 400);
-      return json(request, env, await updateCounter(env, slug, 'views', 1));
-    }
+      const statsMatch = url.pathname.match(/^\/api\/stats\/(.+)$/);
+      if (request.method === 'GET' && statsMatch) {
+        const slug = normalizeSlug(decodeURIComponent(statsMatch[1]));
+        return json(request, env, await getStats(env, slug));
+      }
 
-    if (request.method === 'POST' && url.pathname === '/api/likes/increment') {
-      const slug = await parseSlugFromBody(request);
-      if (!slug) return json(request, env, { error: 'Missing or invalid slug.' }, 400);
-      return json(request, env, await updateCounter(env, slug, 'likes', 1));
+      return json(request, env, { error: 'Not found' }, 404);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      const status = message.includes('slug') ? 400 : 500;
+      return json(request, env, { error: message }, status);
     }
-
-    if (request.method === 'POST' && url.pathname === '/api/likes/decrement') {
-      const slug = await parseSlugFromBody(request);
-      if (!slug) return json(request, env, { error: 'Missing or invalid slug.' }, 400);
-      return json(request, env, await updateCounter(env, slug, 'likes', -1));
-    }
-
-    return json(request, env, { error: 'Not found.' }, 404);
-  },
+  }
 };
+
+async function health(request: Request, env: Env): Promise<Response> {
+  const result = await env.DB.prepare('SELECT 1 AS ok').first<{ ok: number }>();
+  return json(request, env, { ok: result?.ok === 1, database: 'connected' });
+}
+
+async function getSlugFromBody(request: Request): Promise<string> {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    throw new Error('A JSON body with a slug is required.');
+  }
+
+  if (!body || typeof body !== 'object' || !('slug' in body)) {
+    throw new Error('A slug is required.');
+  }
+
+  return normalizeSlug(String((body as { slug: unknown }).slug));
+}
+
+function normalizeSlug(slug: string): string {
+  const normalized = slug.trim().toLowerCase().replace(/[^a-z0-9/_-]+/g, '-').replace(/-+/g, '-').replace(/^[-/]+|[-/]+$/g, '');
+  if (!normalized) throw new Error('A valid slug is required.');
+  if (normalized.length > 240) throw new Error('Slug must be 240 characters or fewer.');
+  return normalized;
+}
+
+async function getStats(env: Env, slug: string): Promise<CounterRow> {
+  const existing = await env.DB.prepare(
+    'SELECT slug, likes, views, created_at, updated_at FROM content_counters WHERE slug = ?'
+  ).bind(slug).first<CounterRow>();
+
+  return existing ?? { slug, likes: 0, views: 0 };
+}
+
+async function incrementCounter(env: Env, request: Request, slug: string, metric: 'like' | 'view', delta: 1 | -1): Promise<CounterRow> {
+  const column = metric === 'like' ? 'likes' : 'views';
+  const action = delta > 0 ? 'increment' : 'decrement';
+
+  const counterSql = `
+    INSERT INTO content_counters (slug, ${column}, created_at, updated_at)
+    VALUES (?, ?, datetime('now'), datetime('now'))
+    ON CONFLICT(slug) DO UPDATE SET
+      ${column} = MAX(0, ${column} + excluded.${column}),
+      updated_at = datetime('now')
+    RETURNING slug, likes, views, created_at, updated_at
+  `;
+
+  const userAgent = request.headers.get('user-agent')?.slice(0, 300) ?? null;
+
+  const counterResult = env.DB.prepare(counterSql).bind(slug, delta);
+  const eventResult = env.DB.prepare(
+    `INSERT INTO counter_events (slug, metric, action, delta, user_agent, created_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))`
+  ).bind(slug, metric, action, delta, userAgent);
+
+  const results = await env.DB.batch([counterResult, eventResult]);
+  const row = results[0].results?.[0] as CounterRow | undefined;
+
+  if (!row) return getStats(env, slug);
+  return row;
+}
+
+function corsHeaders(request: Request, env: Env): Record<string, string> {
+  const allowed = env.ALLOWED_ORIGINS || '*';
+  const origin = request.headers.get('Origin') || '';
+  const allowedOrigins = allowed.split(',').map((item) => item.trim()).filter(Boolean);
+  const allowOrigin = allowed === '*' || allowedOrigins.includes(origin) ? (allowed === '*' ? '*' : origin) : allowedOrigins[0] || '*';
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Vary': 'Origin'
+  };
+}
+
+function json(request: Request, env: Env, body: JsonObject, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders(request, env),
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store'
+    }
+  });
+}
