@@ -1,24 +1,19 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // wrangler.jsonc
-  "name": "like-api",
+  "name": "revrebel-like-api",
   "main": "src/index.ts",
-  "compatibility_date": "2026-06-05",
+  "compatibility_date": "2026-04-21",
   "observability": {
     "enabled": true
   },
   "vars": {
-    // Comma-separated origins. Use "*" while testing, then lock it down.
-    // Example: "https://www.revrebel.io,https://revrebel.io"
     "ALLOWED_ORIGINS": "*"
   },
-  "kv_namespaces": [
+  "d1_databases": [
     {
-      "binding": "LIKES_VIEWS_KV",
-      "id": "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID",
-      "preview_id": "REPLACE_WITH_PREVIEW_KV_NAMESPACE_ID"
+      "binding": "DB",
+      "database_name": "revrebel-like-api-db",
+      "database_id": "PASTE_DATABASE_ID_HERE"
     }
   ]
 }
-
-

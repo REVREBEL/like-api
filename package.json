@@ -1,14 +1,18 @@
 {
-  "name": "revrebel-like-worker",
+  "name": "revrebel-like-api",
   "version": "1.0.0",
   "private": true,
+  "description": "Cloudflare Worker API for likes/views using Cloudflare D1 with migrations.",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "kv:create": "wrangler kv namespace create LIKES_VIEWS_KV",
-    "kv:create-preview": "wrangler kv namespace create LIKES_VIEWS_KV --preview"
+    "db:create": "wrangler d1 create revrebel-like-api-db",
+    "db:migrate:local": "wrangler d1 migrations apply revrebel-like-api-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply revrebel-like-api-db --remote",
+    "db:migrations:list": "wrangler d1 migrations list revrebel-like-api-db",
+    "db:query:remote": "wrangler d1 execute revrebel-like-api-db --remote --command"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "latest",
