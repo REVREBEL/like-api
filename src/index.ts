@@ -18,6 +18,7 @@ const JS_CLIENT = `(() => {
   async function request(path, body) {
     const response = await fetch(API_BASE + path, {
       method: 'POST',
+      mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
     });
@@ -26,7 +27,9 @@ const JS_CLIENT = `(() => {
   }
 
   async function getStats(slug) {
-    const response = await fetch(API_BASE + '/api/stats/' + encodeURIComponent(slug));
+    const response = await fetch(API_BASE + '/api/stats/' + encodeURIComponent(slug), {
+      mode: 'cors'
+    });
     if (!response.ok) throw new Error(await response.text());
     return response.json();
   }
@@ -107,7 +110,21 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request, env) });
 
     try {
-      if (url.pathname === '/') return json(request, env, { ok: true, service: 'revrebel-like-api', storage: 'd1' });
+      if (url.pathname === '/') {
+        return json(request, env, {
+          ok: true,
+          service: 'revrebel-like-api',
+          storage: 'd1',
+          endpoints: [
+            'GET /api/health',
+            'GET /likes-views-devlink.js',
+            'POST /api/views/increment',
+            'POST /api/likes/increment',
+            'POST /api/likes/decrement',
+            'GET /api/stats/:slug'
+          ]
+        });
+      }
       if (url.pathname === '/api/health') return health(request, env);
       if (url.pathname === '/likes-views-devlink.js') {
         return new Response(JS_CLIENT, {
