@@ -14,7 +14,14 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === 'OPTIONS') {
+      if (!isAllowedOrigin(request, env)) {
+        return new Response(null, { status: 403, headers: corsHeaders(request, env) });
+      }
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+    }
+
+    if (!isAllowedOrigin(request, env)) {
+      return json(request, env, { error: 'Origin not allowed.' }, 403);
     }
 
     try {
@@ -137,13 +144,24 @@ async function incrementCounter(env: Env, request: Request, slug: string, metric
   return row ?? getStats(env, slug);
 }
 
+function isAllowedOrigin(request: Request, env: Env): boolean {
+  const allowed = env.ALLOWED_ORIGINS || '*';
+  if (allowed === '*') return true;
+
+  const origin = request.headers.get('Origin');
+  if (!origin) return true;
+
+  const allowedOrigins = allowed.split(',').map((item) => item.trim()).filter(Boolean);
+  return allowedOrigins.includes(origin);
+}
+
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const allowed = env.ALLOWED_ORIGINS || '*';
   const origin = request.headers.get('Origin') || '';
   const allowedOrigins = allowed.split(',').map((item) => item.trim()).filter(Boolean);
   const allowOrigin = allowed === '*' || allowedOrigins.includes(origin)
     ? (allowed === '*' ? '*' : origin)
-    : allowedOrigins[0] || '*';
+    : 'null';
 
   return {
     'Access-Control-Allow-Origin': allowOrigin,
