@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 
 const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID;
 const apiToken = process.env.CLOUDFLARE_API_TOKEN;
-const databaseName = process.env.D1_DATABASE_NAME || 'revrebel-like-api-db';
+const databaseName = process.env.D1_DATABASE_NAME || 'likes_db';
 const sourceConfigPath = process.env.WRANGLER_SOURCE_CONFIG || 'wrangler.jsonc';
 const generatedConfigPath = process.env.WRANGLER_GENERATED_CONFIG || 'wrangler.generated.jsonc';
 
