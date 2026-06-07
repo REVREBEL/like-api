@@ -24,8 +24,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "revrebel-like-api-db",
-      "database_id": "PASTE_DATABASE_ID_HERE"
+      "database_name": "likes_db",
+      "database_id": "5d6d7477-acdb-448f-92ce-abe484093b29"
     }
   ]
 }
