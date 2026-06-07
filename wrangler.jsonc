@@ -24,7 +24,7 @@
     { "pattern": "likes.revrebel.io", "custom_domain": true }
   ],
   "vars": {
-    "ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io"
+    "ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io,https://revrebel-rebuild.webflow.io,https://www.revrebel-rebuild.webflow.io"
   },
   "d1_databases": [
     {
