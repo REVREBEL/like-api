@@ -1,5 +1,5 @@
 {
-  "name": "revrebel-like-api",
+  "name": "like-api",
   "version": "1.0.0",
   "private": true,
   "description": "Cloudflare Worker API for likes/views using Cloudflare D1 with migrations.",
