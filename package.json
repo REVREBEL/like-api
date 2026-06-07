@@ -12,7 +12,11 @@
     "db:migrate:local": "wrangler d1 migrations apply revrebel-like-api-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply revrebel-like-api-db --remote",
     "db:migrations:list": "wrangler d1 migrations list revrebel-like-api-db",
-    "db:query:remote": "wrangler d1 execute revrebel-like-api-db --remote --command"
+    "db:query:remote": "wrangler d1 execute revrebel-like-api-db --remote --command",
+    "cf:prepare-d1": "node scripts/prepare-d1.mjs",
+    "cf:migrate": "wrangler d1 migrations apply revrebel-like-api-db --remote --config wrangler.generated.jsonc",
+    "cf:deploy": "wrangler deploy --config wrangler.generated.jsonc",
+    "cf:build": "npm run cf:prepare-d1 && npm run cf:migrate && npm run cf:deploy"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "latest",
