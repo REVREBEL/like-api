@@ -3,6 +3,8 @@
   "name": "like-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-21",
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": {
     "enabled": false,
     "head_sampling_rate": 1,
@@ -18,6 +20,9 @@
       "head_sampling_rate": 1
     }
   },
+"routes": [
+    { "pattern": "likes.revrebel.io", "custom_domain": true }
+  ],
   "vars": {
     "ALLOWED_ORIGINS": "*"
   },
