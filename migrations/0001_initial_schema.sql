@@ -1,4 +1,3 @@
--- REVREBEL like/view counter schema
 -- D1 uses SQLite semantics.
 
 CREATE TABLE IF NOT EXISTS content_counters (
