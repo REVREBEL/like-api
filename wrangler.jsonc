@@ -20,11 +20,11 @@
       "head_sampling_rate": 1
     }
   },
-"routes": [
+  "routes": [
     { "pattern": "likes.revrebel.io", "custom_domain": true }
   ],
   "vars": {
-    "ALLOWED_ORIGINS": "*"
+    "ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io"
   },
   "d1_databases": [
     {
