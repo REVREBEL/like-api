@@ -57,7 +57,7 @@ Wrangler will return a `database_id`. Paste that ID into `wrangler.jsonc` under 
 "d1_databases": [
   {
     "binding": "DB",
-    "database_name": "revrebel-like-api-db",
+    "database_name": "likes_db",
     "database_id": "PASTE_DATABASE_ID_HERE"
   }
 ]
