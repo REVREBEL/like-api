@@ -9,115 +9,22 @@ type CounterRow = {
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
 type JsonObject = { [key: string]: JsonValue };
 
-const JS_CLIENT = `(() => {
-  const API_BASE = (window.LIKES_API_BASE || '').replace(/\/$/, '');
-
-  const getSlug = (el, attr) => el.getAttribute(attr) || el.getAttribute('data-storage-key') || window.location.pathname.replace(/^\/+|\/+$/g, '') || 'home';
-  const fmt = (value) => Number(value || 0).toLocaleString();
-
-  async function request(path, body) {
-    const response = await fetch(API_BASE + path, {
-      method: 'POST',
-      mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {})
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  }
-
-  async function getStats(slug) {
-    const response = await fetch(API_BASE + '/api/stats/' + encodeURIComponent(slug), {
-      mode: 'cors'
-    });
-    if (!response.ok) throw new Error(await response.text());
-    return response.json();
-  }
-
-  function updateMetrics(slug, stats) {
-    document.querySelectorAll('[data-metric-like="' + CSS.escape(slug) + '"]').forEach((el) => el.textContent = fmt(stats.likes));
-    document.querySelectorAll('[data-metric-view="' + CSS.escape(slug) + '"]').forEach((el) => el.textContent = fmt(stats.views));
-  }
-
-  async function hydrate(slug) {
-    try {
-      const stats = await getStats(slug);
-      updateMetrics(slug, stats);
-    } catch (error) {
-      console.warn('[REVREBEL likes] stats failed', error);
-    }
-  }
-
-  function initLikes() {
-    document.querySelectorAll('[data-action-like]').forEach((button) => {
-      const slug = getSlug(button, 'data-action-like');
-      const storageKey = 'revrebel-like:' + (button.getAttribute('data-storage-key') || slug);
-      const liked = localStorage.getItem(storageKey) === '1';
-      button.classList.toggle('is-liked', liked);
-      button.setAttribute('aria-pressed', liked ? 'true' : 'false');
-      hydrate(slug);
-
-      button.addEventListener('click', async () => {
-        const alreadyLiked = localStorage.getItem(storageKey) === '1';
-        const path = alreadyLiked ? '/api/likes/decrement' : '/api/likes/increment';
-        button.disabled = true;
-        try {
-          const stats = await request(path, { slug });
-          localStorage.setItem(storageKey, alreadyLiked ? '0' : '1');
-          button.classList.toggle('is-liked', !alreadyLiked);
-          button.setAttribute('aria-pressed', !alreadyLiked ? 'true' : 'false');
-          updateMetrics(slug, stats);
-          window.dispatchEvent(new CustomEvent('like:toggled', { detail: { slug, liked: !alreadyLiked, stats } }));
-        } catch (error) {
-          console.warn('[REVREBEL likes] toggle failed', error);
-        } finally {
-          button.disabled = false;
-        }
-      });
-    });
-  }
-
-  function initViews() {
-    document.querySelectorAll('[data-action-view]').forEach(async (el) => {
-      const slug = getSlug(el, 'data-action-view');
-      const sessionKey = 'revrebel-view:' + slug;
-      if (sessionStorage.getItem(sessionKey) === '1') {
-        hydrate(slug);
-        return;
-      }
-      sessionStorage.setItem(sessionKey, '1');
-      try {
-        const stats = await request('/api/views/increment', { slug });
-        updateMetrics(slug, stats);
-      } catch (error) {
-        console.warn('[REVREBEL likes] view failed', error);
-      }
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { initLikes(); initViews(); });
-  } else {
-    initLikes();
-    initViews();
-  }
-})();`;
-
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders(request, env) });
+    }
 
     try {
       if (url.pathname === '/') {
         return json(request, env, {
           ok: true,
-          service: 'revrebel-like-api',
+          service: 'like-api',
           storage: 'd1',
           endpoints: [
             'GET /api/health',
-            'GET /likes-views-devlink.js',
             'POST /api/views/increment',
             'POST /api/likes/increment',
             'POST /api/likes/decrement',
@@ -125,15 +32,9 @@ export default {
           ]
         });
       }
-      if (url.pathname === '/api/health') return health(request, env);
-      if (url.pathname === '/likes-views-devlink.js') {
-        return new Response(JS_CLIENT, {
-          headers: {
-            ...corsHeaders(request, env),
-            'Content-Type': 'application/javascript; charset=utf-8',
-            'Cache-Control': 'public, max-age=300'
-          }
-        });
+
+      if (request.method === 'GET' && url.pathname === '/api/health') {
+        return health(request, env);
       }
 
       if (request.method === 'POST' && url.pathname === '/api/views/increment') {
@@ -160,7 +61,7 @@ export default {
       return json(request, env, { error: 'Not found' }, 404);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      const status = message.includes('slug') ? 400 : 500;
+      const status = message.toLowerCase().includes('slug') ? 400 : 500;
       return json(request, env, { error: message }, status);
     }
   }
@@ -173,6 +74,7 @@ async function health(request: Request, env: Env): Promise<Response> {
 
 async function getSlugFromBody(request: Request): Promise<string> {
   let body: unknown;
+
   try {
     body = await request.json();
   } catch {
@@ -187,9 +89,16 @@ async function getSlugFromBody(request: Request): Promise<string> {
 }
 
 function normalizeSlug(slug: string): string {
-  const normalized = slug.trim().toLowerCase().replace(/[^a-z0-9/_-]+/g, '-').replace(/-+/g, '-').replace(/^[-/]+|[-/]+$/g, '');
+  const normalized = slug
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9/_-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-/]+|[-/]+$/g, '');
+
   if (!normalized) throw new Error('A valid slug is required.');
   if (normalized.length > 240) throw new Error('Slug must be 240 characters or fewer.');
+
   return normalized;
 }
 
@@ -225,15 +134,16 @@ async function incrementCounter(env: Env, request: Request, slug: string, metric
   const results = await env.DB.batch([counterResult, eventResult]);
   const row = results[0].results?.[0] as CounterRow | undefined;
 
-  if (!row) return getStats(env, slug);
-  return row;
+  return row ?? getStats(env, slug);
 }
 
 function corsHeaders(request: Request, env: Env): Record<string, string> {
   const allowed = env.ALLOWED_ORIGINS || '*';
   const origin = request.headers.get('Origin') || '';
   const allowedOrigins = allowed.split(',').map((item) => item.trim()).filter(Boolean);
-  const allowOrigin = allowed === '*' || allowedOrigins.includes(origin) ? (allowed === '*' ? '*' : origin) : allowedOrigins[0] || '*';
+  const allowOrigin = allowed === '*' || allowedOrigins.includes(origin)
+    ? (allowed === '*' ? '*' : origin)
+    : allowedOrigins[0] || '*';
 
   return {
     'Access-Control-Allow-Origin': allowOrigin,
