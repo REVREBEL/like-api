@@ -1,4 +1,4 @@
-# REVREBEL Like API
+# LIKES API
 
 Cloudflare Worker API for Webflow-powered like and view counters.
 
