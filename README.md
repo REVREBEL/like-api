@@ -2,133 +2,164 @@
 
 Cloudflare Worker API for Webflow-powered like and view counters.
 
-This project uses **Cloudflare Workers** for the API and **Cloudflare D1** for storage so the database schema is owned by the repo through SQL migrations.
+Cloudflare D1 is the source of truth. Browser increment requests update D1 immediately, while a scheduled Worker sync publishes the latest accumulated totals to the Webflow Articles CMS collection every five minutes.
 
 ## Routes
 
 ```txt
 GET  /
 GET  /api/health
-GET  /likes-views-devlink.js
 POST /api/views/increment
 POST /api/likes/increment
 POST /api/likes/decrement
 GET  /api/stats/:slug
 ```
 
+The Webflow page should render the `likes` and `views` CMS fields directly. It does not need to call `GET /api/stats/:slug` on every page load. That endpoint remains available for diagnostics and fallback use.
+
+## Data flow
+
+```txt
+Webflow page renders CMS count
+        ↓
+Visitor view or like triggers one API request
+        ↓
+Worker atomically updates D1 and marks the row pending
+        ↓
+Scheduled Worker runs every five minutes
+        ↓
+Worker pushes the latest totals to Webflow CMS
+        ↓
+Worker publishes the changed CMS items
+```
+
+Multiple increments during the five-minute window are consolidated into one Webflow update per CMS item.
+
 ## Database
 
-The Worker expects a D1 binding named:
+The Worker expects the D1 binding:
 
 ```txt
 DB
 ```
 
-The Wrangler database name is:
+The configured database is:
 
 ```txt
-revrebel-like-api-db
+likes_db
 ```
 
-Migrations create:
+Migrations create and maintain:
 
 ```txt
 content_counters
 counter_events
+Webflow item mappings
+CMS synchronization state
 ```
 
-## First-time setup
+The synchronization fields include:
 
-Install dependencies:
+```txt
+webflow_item_id
+synced_likes
+synced_views
+sync_pending
+last_synced_at
+sync_error
+```
+
+## Webflow configuration
+
+```txt
+Site ID:       6a09244ce43d4439301ce56f
+Collection ID: 6a214464a0f85c77ad29ea36
+Likes field:   likes
+Views field:   views
+```
+
+The collection ID is stored as a non-secret Worker variable in `wrangler.jsonc`:
+
+```jsonc
+"WEBFLOW_COLLECTION_ID": "6a214464a0f85c77ad29ea36"
+```
+
+The Worker discovers Webflow item IDs from article slugs on the first pending synchronization and saves those mappings in D1. Subsequent synchronizations reuse the stored item IDs.
+
+## Required Cloudflare secret
+
+Create this encrypted runtime secret in the Cloudflare Worker settings:
+
+```txt
+WEBFLOW_API_TOKEN
+```
+
+The token must be authorized to read, update, and publish CMS collection items. Do not commit the token to GitHub or place it in Webflow browser code.
+
+## Scheduled synchronization
+
+`wrangler.jsonc` contains:
+
+```jsonc
+"triggers": {
+  "crons": ["*/5 * * * *"]
+}
+```
+
+This runs the CMS synchronization every five minutes.
+
+The sync is concurrency-safe: if another increment arrives while Webflow is being updated, the row remains pending and is included in the next scheduled run.
+
+## Install and deploy
 
 ```bash
 npm install
+npm run cf:build
 ```
 
-Create the D1 database:
+`cf:build` applies all pending D1 migrations before deploying the Worker:
 
-```bash
-npm run db:create
+```txt
+npm run cf:migrate
+npm run cf:deploy
 ```
 
-Wrangler will return a `database_id`. Paste that ID into `wrangler.jsonc` under `d1_databases`:
-
-```jsonc
-"d1_databases": [
-  {
-    "binding": "DB",
-    "database_name": "likes_db",
-    "database_id": "PASTE_DATABASE_ID_HERE"
-  }
-]
-```
-
-Apply migrations to the remote D1 database:
-
-```bash
-npm run db:migrate:remote
-```
-
-Deploy the Worker:
-
-```bash
-npm run deploy
-```
-
-## Cloudflare Workers Builds
-
-After the D1 database exists and the `database_id` is committed in `wrangler.jsonc`, use this build/deploy command:
-
-```bash
-npm run db:migrate:remote && npm run deploy
-```
-
-If Cloudflare does not install dependencies automatically, use:
-
-```bash
-npm install && npm run db:migrate:remote && npm run deploy
-```
-
-## Webflow embed
-
-Add this before `</body>`:
-
-```html
-<script>
-  window.LIKES_API_BASE = "https://likes.revrebel.io";
-</script>
-<script src="https://likes.revrebel.io/likes-views-devlink.js"></script>
-```
-
-Example attributes:
-
-```html
-<button data-action-like="your-post-slug" data-storage-key="your-post-slug" aria-pressed="false">
-  Like <span data-metric-like="your-post-slug">0</span>
-</button>
-
-<div data-action-view="your-post-slug" hidden></div>
-Views: <span data-metric-view="your-post-slug">0</span>
-```
-
-## Test commands
-
-Health:
+## Health check
 
 ```bash
 curl https://likes.revrebel.io/api/health
 ```
 
-Increment like:
+The response includes:
+
+```txt
+database
+pendingWebflowSyncs
+webflowTokenConfigured
+```
+
+## Increment examples
+
+Increment a view:
+
+```bash
+curl -X POST https://likes.revrebel.io/api/views/increment \
+  -H "Content-Type: application/json" \
+  -d '{"slug":"understanding-the-role-of-revenue-management"}'
+```
+
+Increment a like:
 
 ```bash
 curl -X POST https://likes.revrebel.io/api/likes/increment \
   -H "Content-Type: application/json" \
-  -d '{"slug":"test-post"}'
+  -d '{"slug":"understanding-the-role-of-revenue-management"}'
 ```
 
-Get stats:
+Read the D1 count directly through the diagnostic endpoint:
 
 ```bash
-curl https://likes.revrebel.io/api/stats/test-post
+curl https://likes.revrebel.io/api/stats/understanding-the-role-of-revenue-management
 ```
+
+Requests made from a browser are restricted to the origins configured by `ALLOWED_ORIGINS` in `wrangler.jsonc`.
