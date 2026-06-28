@@ -1,5 +1,4 @@
 {
-      "head_sampling_rate": 1,
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "like-api",
 	"main": "src/index.ts",
