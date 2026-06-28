@@ -1,40 +1,46 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "like-api",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-04-21",
-  "workers_dev": false,
-  "preview_urls": false,
-  "observability": {
-    "enabled": false,
-    "head_sampling_rate": 1,
-    "logs": {
-      "enabled": true,
       "head_sampling_rate": 1,
-      "persist": true,
-      "invocation_logs": true
-    },
-    "traces": {
-      "enabled": false,
-      "persist": true,
-      "head_sampling_rate": 1
-    }
-  },
-  "routes": [
-    { "pattern": "likes.revrebel.io", "custom_domain": true }
-  ],
-  "triggers": {
-    "crons": ["*/5 * * * *"]
-  },
-  "vars": {
-    "ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io",
-    "WEBFLOW_COLLECTION_ID": "6a214464a0f85c77ad29ea36"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "likes_db",
-      "database_id": "5d6d7477-acdb-448f-92ce-abe484093b29"
-    }
-  ]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "like-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-04-21",
+	"workers_dev": false,
+	"preview_urls": false,
+	"observability": {
+		"enabled": false,
+		"head_sampling_rate": 1,
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"persist": true,
+			"invocation_logs": true
+		},
+		"traces": {
+			"enabled": false,
+			"persist": true,
+			"head_sampling_rate": 1
+		}
+	},
+	"routes": [
+		{
+			"pattern": "likes.revrebel.io",
+			"custom_domain": true
+		}
+	],
+	"triggers": {
+		"crons": [
+			"*/5 * * * *"
+		]
+	},
+	"vars": {
+		"ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io,https://revrebel-rebuild.webflow.io,https://www.revrebel-rebuild.webflow.io",
+		"WEBFLOW_COLLECTION_ID": "6a214464a0f85c77ad29ea36"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "likes_db",
+			"database_id": "5d6d7477-acdb-448f-92ce-abe484093b29"
+		}
+	]
 }
