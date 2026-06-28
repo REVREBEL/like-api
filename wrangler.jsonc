@@ -23,8 +23,12 @@
   "routes": [
     { "pattern": "likes.revrebel.io", "custom_domain": true }
   ],
+  "triggers": {
+    "crons": ["*/5 * * * *"]
+  },
   "vars": {
-    "ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io,https://revrebel-rebuild.webflow.io,https://www.revrebel-rebuild.webflow.io"
+    "ALLOWED_ORIGINS": "https://revrebel.io,https://www.revrebel.io",
+    "WEBFLOW_COLLECTION_ID": "6a214464a0f85c77ad29ea36"
   },
   "d1_databases": [
     {
